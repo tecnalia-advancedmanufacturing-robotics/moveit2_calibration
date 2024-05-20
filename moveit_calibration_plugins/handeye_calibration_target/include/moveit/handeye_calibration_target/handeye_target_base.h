@@ -126,13 +126,15 @@ public:
   const std::size_t CAMERA_MATRIX_VECTOR_DIMENSION = 9;  // 3x3 camera intrinsic matrix
   const std::size_t CAMERA_MATRIX_WIDTH = 3;
   const std::size_t CAMERA_MATRIX_HEIGHT = 3;
-  const std::size_t CAMERA_DISTORTION_VECTOR_DIMENSION = 5;  // distortion parameters (k1, k2, t1, t2, k3)
+  const std::map<std::string, std::size_t> CAMERA_DISTORTION_MODELS_VECTOR_DIMENSIONS = { { "none", 0 },
+                                                                                          { "plumb_bob", 5 }, // distortion parameters (k1, k2, t1, t2, k3)
+                                                                                          { "rational_polynomial", 8 } };
 
   virtual ~HandEyeTargetBase() = default;
   HandEyeTargetBase()
   {
     camera_matrix_ = cv::Mat::eye(3, 3, CV_64F);
-    distortion_coeffs_ = cv::Mat::zeros(5, 1, CV_64F);
+    // distortion_coeffs_ = cv::Mat::zeros(8, 1, CV_64F);
   }
 
   /**
@@ -238,11 +240,22 @@ public:
       return false;
     }
 
-    if (msg->d.size() != CAMERA_DISTORTION_VECTOR_DIMENSION)
+    if (0 == CAMERA_DISTORTION_MODELS_VECTOR_DIMENSIONS.count(msg->distortion_model))
+    {
+      RCLCPP_ERROR(LOGGER_CALIBRATION_TARGET,
+                   "Invalid camera distortion model, '%s'.",
+                   msg->distortion_model.c_str());
+      return false;
+    }
+
+    const size_t camera_distortion_vector_dimension =
+        CAMERA_DISTORTION_MODELS_VECTOR_DIMENSIONS.at(msg->distortion_model);
+
+    if (msg->d.size() != camera_distortion_vector_dimension)
     {
       RCLCPP_ERROR(LOGGER_CALIBRATION_TARGET,
                    "Invalid distortion parameters dimension, current is %ld, required is %zu.", msg->d.size(),
-                   CAMERA_DISTORTION_VECTOR_DIMENSION);
+                   camera_distortion_vector_dimension);
       return false;
     }
 
@@ -258,7 +271,8 @@ public:
     }
 
     // Store camera distortion info
-    for (size_t i = 0; i < CAMERA_DISTORTION_VECTOR_DIMENSION; i++)
+    distortion_coeffs_ = cv::Mat::zeros(camera_distortion_vector_dimension, 1, CV_64F);
+    for (size_t i = 0; i < camera_distortion_vector_dimension; i++)
     {
       distortion_coeffs_.at<double>(i, 0) = msg->d[i];
     }
@@ -432,8 +446,8 @@ protected:
   //     [ 0  0  1]
   cv::Mat camera_matrix_;
 
-  // Vector of distortion coefficients (k1, k2, t1, t2, k3)
-  // Assume `plumb_bob` model
+  // Vector of distortion coefficients
+  // Ex. (k1, k2, t1, t2, k3) for `plumb_bob` model
   cv::Mat distortion_coeffs_;
 
   // flag to indicate if target parameter values are correctly defined
