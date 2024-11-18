@@ -35,7 +35,7 @@
 /* Author: Yu Yan */
 
 #include <moveit/handeye_calibration_rviz_plugin/handeye_control_widget.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 namespace moveit_rviz_plugin
@@ -617,12 +617,14 @@ void ControlTabWidget::saveCameraPoseBtnClicked(bool clicked)
   }
 
   // DontUseNativeDialog option set to avoid this issue: https://github.com/ros-planning/moveit/issues/2357
-  QString file_name = QFileDialog::getSaveFileName(
-      this, tr("Save Camera Robot Pose"), "",
-      tr("Launch scripts - ALL (*.launch* *.py *.xml *.yaml *.yml);;Launch scripts - "
-         "PYTHON (*.launch.py *.py);;Launch scripts - XML (*.launch *.launch.xml *.xml);;Launch "
-         "scripts - YAML (*.launch.yaml *.launch.yml *.yaml *.yml);;All Files (*)"),
-      nullptr, QFileDialog::DontUseNativeDialog);
+  QString file_name = QFileDialog::getSaveFileName(this, tr("Save Camera Robot Pose"), "",
+                                                   tr("Launch scripts - ALL (*.launch* *.py *.xml *.yaml "
+                                                      "*.yml);;Launch scripts - "
+                                                      "PYTHON (*.launch.py *.py);;Launch scripts - XML (*.launch "
+                                                      "*.launch.xml *.xml);;Launch "
+                                                      "scripts - YAML (*.launch.yaml *.launch.yml *.yaml *.yml);;All "
+                                                      "Files (*)"),
+                                                   nullptr, QFileDialog::DontUseNativeDialog);
 
   if (file_name.isEmpty())
     return;
@@ -672,10 +674,10 @@ void ControlTabWidget::saveCameraPoseBtnClicked(bool clicked)
   }
   else
   {
-    QMessageBox::warning(
-        this, tr("Unknown file type"),
-        tr("Unable to save file, unknown file type. Only `.py`, `.xml`, and `.yaml`/`.yml` are currently "
-           "supported for ROS 2 launch scripts."));
+    QMessageBox::warning(this, tr("Unknown file type"),
+                         tr("Unable to save file, unknown file type. Only `.py`, `.xml`, and `.yaml`/`.yml` are "
+                            "currently "
+                            "supported for ROS 2 launch scripts."));
     return;
   }
 
@@ -721,15 +723,23 @@ void ControlTabWidget::setGroupName(const std::string& group_name)
 void ControlTabWidget::fillPlanningGroupNameComboBox()
 {
   group_name_->clear();
-  // Fill in available planning group names
-  planning_scene_monitor_.reset(new planning_scene_monitor::PlanningSceneMonitor(node_, "robot_description", tf_buffer_,
-                                                                                 "planning_scene_monitor"));
+
+  // planning_scene_monitor_.reset();
+  // planning_scene_monitor_.reset(new planning_scene_monitor::PlanningSceneMonitor(node_, "robot_description",
+  // tf_buffer_, "planning_scene_monitor"));
+  planning_scene_monitor_.reset(
+      new planning_scene_monitor::PlanningSceneMonitor(node_, "robot_description", "planning_scene_monitor"));
+
   if (planning_scene_monitor_)
   {
     planning_scene_monitor_->startSceneMonitor(calibration_display_->planning_scene_topic_property_->getStdString());
+
     std::string service_name = planning_scene_monitor::PlanningSceneMonitor::DEFAULT_PLANNING_SCENE_SERVICE;
     if (!calibration_display_->move_group_ns_property_->getStdString().empty())
+    {
       service_name = rclcpp::names::append(calibration_display_->move_group_ns_property_->getStdString(), service_name);
+    }
+
     if (planning_scene_monitor_->requestPlanningSceneState(service_name))
     {
       const moveit::core::RobotModelConstPtr& kmodel = planning_scene_monitor_->getRobotModel();
@@ -737,6 +747,7 @@ void ControlTabWidget::fillPlanningGroupNameComboBox()
       {
         group_name_->addItem(group_name.c_str());
       }
+
       if (!group_name_->currentText().isEmpty())
         setGroupName(group_name_->currentText().toStdString());
     }
@@ -1029,7 +1040,7 @@ void ControlTabWidget::computePlan()
     move_group_->setMaxVelocityScalingFactor(0.5);
     move_group_->setMaxAccelerationScalingFactor(0.5);
     current_plan_.reset(new moveit::planning_interface::MoveGroupInterface::Plan());
-    planning_res_ = (move_group_->plan(*current_plan_) == moveit::planning_interface::MoveItErrorCode::SUCCESS) ?
+    planning_res_ = (move_group_->plan(*current_plan_) == moveit_msgs::msg::MoveItErrorCodes::SUCCESS) ?
                         ControlTabWidget::SUCCESS :
                         ControlTabWidget::FAILURE_PLAN_FAILED;
 
@@ -1054,7 +1065,7 @@ void ControlTabWidget::autoExecuteBtnClicked(bool clicked)
 void ControlTabWidget::computeExecution()
 {
   if (move_group_ && current_plan_)
-    planning_res_ = (move_group_->execute(*current_plan_) == moveit::planning_interface::MoveItErrorCode::SUCCESS) ?
+    planning_res_ = (move_group_->execute(*current_plan_) == moveit_msgs::msg::MoveItErrorCodes::SUCCESS) ?
                         ControlTabWidget::SUCCESS :
                         ControlTabWidget::FAILURE_PLAN_FAILED;
 
@@ -1086,9 +1097,9 @@ void ControlTabWidget::planFinished()
       QMessageBox::warning(this, tr("Error"), tr("Could not compute plan. Missing move_group."));
       break;
     case ControlTabWidget::FAILURE_WRONG_MOVE_GROUP:
-      QMessageBox::warning(
-          this, tr("Error"),
-          tr("Could not compute plan. Joint names for recorded state do not match names from current planning group."));
+      QMessageBox::warning(this, tr("Error"),
+                           tr("Could not compute plan. Joint names for recorded state do not match names from current "
+                              "planning group."));
       break;
     case ControlTabWidget::FAILURE_PLAN_FAILED:
       QMessageBox::warning(this, tr("Error"), tr("Could not compute plan. Planning failed."));
