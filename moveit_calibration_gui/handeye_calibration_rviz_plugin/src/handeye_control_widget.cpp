@@ -35,7 +35,7 @@
 /* Author: Yu Yan */
 
 #include <moveit/handeye_calibration_rviz_plugin/handeye_control_widget.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 namespace moveit_rviz_plugin
