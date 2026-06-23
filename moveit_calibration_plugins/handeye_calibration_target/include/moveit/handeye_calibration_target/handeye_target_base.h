@@ -126,7 +126,9 @@ public:
   const std::size_t CAMERA_MATRIX_VECTOR_DIMENSION = 9;  // 3x3 camera intrinsic matrix
   const std::size_t CAMERA_MATRIX_WIDTH = 3;
   const std::size_t CAMERA_MATRIX_HEIGHT = 3;
-  const std::size_t CAMERA_DISTORTION_VECTOR_DIMENSION = 5;  // distortion parameters (k1, k2, t1, t2, k3)
+  // OpenCV / sensor_msgs: plumb_bob uses 5 coeffs; rational model uses 8 (k1..k6, p1, p2); up to 14 for some models
+  const std::size_t CAMERA_DISTORTION_VECTOR_DIMENSION_MIN = 5;
+  const std::size_t CAMERA_DISTORTION_VECTOR_DIMENSION_MAX = 14;
 
   virtual ~HandEyeTargetBase() = default;
   HandEyeTargetBase()
@@ -238,11 +240,13 @@ public:
       return false;
     }
 
-    if (msg->d.size() != CAMERA_DISTORTION_VECTOR_DIMENSION)
+    if (msg->d.size() < CAMERA_DISTORTION_VECTOR_DIMENSION_MIN ||
+        msg->d.size() > CAMERA_DISTORTION_VECTOR_DIMENSION_MAX)
     {
       RCLCPP_ERROR(LOGGER_CALIBRATION_TARGET,
-                   "Invalid distortion parameters dimension, current is %ld, required is %zu.", msg->d.size(),
-                   CAMERA_DISTORTION_VECTOR_DIMENSION);
+                   "Invalid distortion parameters dimension, current is %ld, required between %zu and %zu (e.g. 5 for "
+                   "plumb_bob, 8 for rational model).",
+                   msg->d.size(), CAMERA_DISTORTION_VECTOR_DIMENSION_MIN, CAMERA_DISTORTION_VECTOR_DIMENSION_MAX);
       return false;
     }
 
@@ -257,8 +261,9 @@ public:
       }
     }
 
-    // Store camera distortion info
-    for (size_t i = 0; i < CAMERA_DISTORTION_VECTOR_DIMENSION; i++)
+    // Store camera distortion info (variable length; OpenCV ArUco accepts 5- or 8-coeff models)
+    distortion_coeffs_.create(static_cast<int>(msg->d.size()), 1, CV_64F);
+    for (size_t i = 0; i < msg->d.size(); ++i)
     {
       distortion_coeffs_.at<double>(i, 0) = msg->d[i];
     }
@@ -432,8 +437,7 @@ protected:
   //     [ 0  0  1]
   cv::Mat camera_matrix_;
 
-  // Vector of distortion coefficients (k1, k2, t1, t2, k3)
-  // Assume `plumb_bob` model
+  // Distortion coefficients as in CameraInfo::d (e.g. 5 plumb_bob, 8 rational)
   cv::Mat distortion_coeffs_;
 
   // flag to indicate if target parameter values are correctly defined
